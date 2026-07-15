@@ -63,7 +63,7 @@ pipeline {
                         )
                     ]) {
 
-                        sh '''
+                        sh """
                         echo "Before Update:"
                         cat deploy.yaml
 
