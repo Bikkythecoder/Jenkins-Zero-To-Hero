@@ -67,7 +67,7 @@ pipeline {
                         echo "Before Update:"
                         cat deploy.yaml
 
-                        sed -i "s|image: .*|image: bikkybabu/cicd-e2e:${IMAGE_TAG}|g" deploy.yaml
+                        sed -i '' 's|image: .*|image: bikkybabu/cicd-e2e:12|g' deploy.yaml
 
                         echo "After Update:"
                         cat deploy.yaml
