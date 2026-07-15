@@ -19,66 +19,69 @@ pipeline {
         stage('Build Docker Image') {
             steps {
                 dir('python-jenkins-argocd-k8s') {
-                    sh """
+                    sh '''
                     echo "Building Docker Image..."
                     docker build -t bikkybabu/cicd-e2e:${IMAGE_TAG} .
-                    """
+                    '''
                 }
             }
         }
 
         stage('Push Docker Image') {
-    steps {
-        dir('python-jenkins-argocd-k8s') {
+            steps {
+                dir('python-jenkins-argocd-k8s') {
+                    withCredentials([
+                        usernamePassword(
+                            credentialsId: 'dockerhub-creds',
+                            usernameVariable: 'DOCKER_USER',
+                            passwordVariable: 'DOCKER_PASS'
+                        )
+                    ]) {
 
-            withCredentials([
-                usernamePassword(
-                    credentialsId: 'dockerhub-creds',
-                    usernameVariable: 'DOCKER_USER',
-                    passwordVariable: 'DOCKER_PASS'
-                )
-            ]) {
+                        sh '''
+                        echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin
 
-                sh """
-                echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin
+                        docker push bikkybabu/cicd-e2e:${IMAGE_TAG}
 
-                docker push bikkybabu/cicd-e2e:${IMAGE_TAG}
-
-                docker logout
-                """
+                        docker logout
+                        '''
+                    }
+                }
             }
         }
-    }
-}
-stage('Update K8S manifest & push to Repo') {
-    steps {
-        dir('python-jenkins-argocd-k8s/deploy') {
-            withCredentials([usernamePassword(
-                credentialsId: 'f87a34a8-0e09-45e7-b9cf-6dc68feac670',
-                usernameVariable: 'GIT_USERNAME',
-                passwordVariable: 'GIT_PASSWORD'
-            )]) {
 
-                sh """
-                echo "Before Update"
-                cat deploy.yaml
+        stage('Update K8S Manifest & Push') {
+            steps {
+                dir('python-jenkins-argocd-k8s') {
 
-                sed -i '' "s|image: .*|image: bikkybabu/cicd-e2e:${BUILD_NUMBER}|g" deploy.yaml
+                    withCredentials([
+                        usernamePassword(
+                            credentialsId: 'github-creds',
+                            usernameVariable: 'GIT_USERNAME',
+                            passwordVariable: 'GIT_PASSWORD'
+                        )
+                    ]) {
 
-                echo "After Update"
-                cat deploy.yaml
+                        sh '''
+                        echo "Before Update"
+                        cat deploy/deploy.yaml
 
-                git config user.name "Jenkins"
-                git config user.email "jenkins@example.com"
+                        sed -i '' "s|image: .*|image: bikkybabu/cicd-e2e:${BUILD_NUMBER}|g" deploy/deploy.yaml
 
-                git add deploy.yaml
-                git commit -m "Updated image to build ${BUILD_NUMBER}" || true
+                        echo "After Update"
+                        cat deploy/deploy.yaml
 
-                git push https://${GIT_USERNAME}:${GIT_PASSWORD}@github.com/Bikkythecoder/Jenkins-Zero-To-Hero.git HEAD:main
-                """
+                        git config user.name "Jenkins"
+                        git config user.email "jenkins@example.com"
+
+                        git add deploy/deploy.yaml
+                        git commit -m "Updated image to build ${BUILD_NUMBER}" || true
+
+                        git push https://${GIT_USERNAME}:${GIT_PASSWORD}@github.com/Bikkythecoder/Jenkins-Zero-To-Hero.git HEAD:main
+                        '''
+                    }
+                }
             }
         }
-    }
-}
     }
 }
