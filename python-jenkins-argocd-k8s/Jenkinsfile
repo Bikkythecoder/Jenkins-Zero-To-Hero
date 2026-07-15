@@ -28,15 +28,28 @@ pipeline {
         }
 
         stage('Push Docker Image') {
-            steps {
-                dir('python-jenkins-argocd-k8s') {
-                    sh '''
-                    echo "Pushing Docker Image..."
-                    docker push bikkybabu/cicd-e2e:${IMAGE_TAG}
-                    '''
-                }
+    steps {
+        dir('python-jenkins-argocd-k8s') {
+
+            withCredentials([
+                usernamePassword(
+                    credentialsId: 'dockerhub-creds',
+                    usernameVariable: 'DOCKER_USER',
+                    passwordVariable: 'DOCKER_PASS'
+                )
+            ]) {
+
+                sh '''
+                echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin
+
+                docker push bikkybabu/cicd-e2e:${IMAGE_TAG}
+
+                docker logout
+                '''
             }
         }
+    }
+}
 
         stage('Update Kubernetes Manifest') {
             steps {
