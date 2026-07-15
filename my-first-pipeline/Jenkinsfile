@@ -1,12 +1,17 @@
 pipeline {
-  agent {
-    docker { image 'node:16-alpine' }
-  }
-  stages {
-    stage('Test') {
-      steps {
-        sh 'node --version'
-      }
+    agent any
+
+    environment {
+        PATH = "/usr/local/bin:/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin"
     }
-  }
+
+    stages {
+        stage('Docker Test') {
+            steps {
+                sh 'docker --version'
+                sh 'docker pull node:16-alpine'
+            }
+        }
+    }
 }
+
