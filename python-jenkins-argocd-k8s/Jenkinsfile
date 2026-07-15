@@ -50,39 +50,32 @@ pipeline {
         }
     }
 }
+stage('Update K8S manifest & push to Repo') {
+    steps {
+        dir('python-jenkins-argocd-k8s/deploy') {
+            withCredentials([usernamePassword(
+                credentialsId: 'f87a34a8-0e09-45e7-b9cf-6dc68feac670',
+                usernameVariable: 'GIT_USERNAME',
+                passwordVariable: 'GIT_PASSWORD'
+            )]) {
 
-        stage('Update Kubernetes Manifest') {
-            steps {
-                dir('python-jenkins-argocd-k8s/deploy') {
+                sh """
+                echo "Before Update"
+                cat deploy.yaml
 
-                    withCredentials([
-                        usernamePassword(
-                            credentialsId: 'github-creds',
-                            usernameVariable: 'GIT_USERNAME',
-                            passwordVariable: 'GIT_PASSWORD'
-                        )
-                    ]) {
+                sed -i '' "s|image: .*|image: bikkybabu/cicd-e2e:${BUILD_NUMBER}|g" deploy.yaml
 
-                        sh """
-                        echo "Before Update:"
-                        cat deploy.yaml
+                echo "After Update"
+                cat deploy.yaml
 
-                        sed -i '' 's|image: .*|image: bikkybabu/cicd-e2e:12|g' deploy.yaml
+                git config user.name "Jenkins"
+                git config user.email "jenkins@example.com"
 
-                        echo "After Update:"
-                        cat deploy.yaml
+                git add deploy.yaml
+                git commit -m "Updated image to build ${BUILD_NUMBER}" || true
 
-                        git config user.name "Jenkins"
-                        git config user.email "jenkins@example.com"
-
-                        git add deploy.yaml
-
-                        git commit -m "Updated image to build ${IMAGE_TAG}" || echo "No changes to commit"
-
-                        git push https://${GIT_USERNAME}:${GIT_PASSWORD}@github.com/Bikkythecoder/Jenkins-Zero-To-Hero.git HEAD:main
-                        """
-                    }
-                }
+                git push https://${GIT_USERNAME}:${GIT_PASSWORD}@github.com/Bikkythecoder/Jenkins-Zero-To-Hero.git HEAD:main
+                """
             }
         }
     }
