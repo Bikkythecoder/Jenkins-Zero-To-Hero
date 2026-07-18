@@ -8,15 +8,6 @@ pipeline {
     }
 
     stages {
-
-        stage('Checkout') {
-            steps {
-                //git branch: 'main',
-                  //  url: 'https://github.com/Bikkythecoder/Jenkins-Zero-To-Hero.git'
-            }
-        }
-
-
         stage('Build and Test') {
             steps {
                 sh '''
@@ -101,7 +92,7 @@ pipeline {
             steps {
 
                 withCredentials([
-                    string(credentialsId: 'github-creds',
+                    string(credentialsId: 'git_creed',
                     variable: 'GITHUB_TOKEN')
                 ]) {
 
