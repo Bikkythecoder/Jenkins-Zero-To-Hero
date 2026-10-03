@@ -36,9 +36,9 @@ stage('Static Code Analysis') {
                 echo "Running SonarQube analysis..."
                 echo "SonarQube URL: $SONAR_URL"
 
-                mvn org.sonarsource.scanner.maven:sonar-maven-plugin:sonar \
-                    -Dsonar.login="$SONAR_AUTH_TOKEN" \
-                    -Dsonar.host.url="$SONAR_URL"
+               mvn org.sonarsource.scanner.maven:sonar-maven-plugin:sonar \
+    -Dsonar.login="$SONAR_AUTH_TOKEN" \
+    -Dsonar.host.url="$SONAR_URL"
             '''
         }
     }
