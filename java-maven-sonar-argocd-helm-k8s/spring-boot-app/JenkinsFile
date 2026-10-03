@@ -14,6 +14,7 @@ pipeline {
             steps {
                 sh '''
                     cd java-maven-sonar-argocd-helm-k8s/spring-boot-app
+
                     mvn clean package
                 '''
             }
@@ -55,32 +56,29 @@ pipeline {
 
             steps {
 
-                script {
+                withCredentials([
+                    usernamePassword(
+                        credentialsId: 'docker-red',
+                        usernameVariable: 'DOCKER_USERNAME',
+                        passwordVariable: 'DOCKER_PASSWORD'
+                    )
+                ]) {
 
-                    withCredentials([
-                        usernamePassword(
-                            credentialsId: 'docker-red',
-                            usernameVariable: 'DOCKER_USERNAME',
-                            passwordVariable: 'DOCKER_PASSWORD'
-                        )
-                    ]) {
+                    sh '''
+                        cd java-maven-sonar-argocd-helm-k8s/spring-boot-app
 
-                        sh '''
-                            cd java-maven-sonar-argocd-helm-k8s/spring-boot-app
+                        echo "$DOCKER_PASSWORD" | docker login \
+                            --username "$DOCKER_USERNAME" \
+                            --password-stdin
 
-                            echo "$DOCKER_PASSWORD" | docker login \
-                                --username "$DOCKER_USERNAME" \
-                                --password-stdin
+                        docker build \
+                            --platform linux/amd64 \
+                            -t "$DOCKER_IMAGE" .
 
-                            docker build \
-                                --platform linux/amd64 \
-                                -t "$DOCKER_IMAGE" .
+                        docker push "$DOCKER_IMAGE"
 
-                            docker push "$DOCKER_IMAGE"
-
-                            docker logout
-                        '''
-                    }
+                        docker logout
+                    '''
                 }
             }
         }
@@ -113,9 +111,16 @@ pipeline {
                         git add \
                             java-maven-sonar-argocd-helm-k8s/spring-boot-app-manifests/deployment.yml
 
-                        git commit -m \
-                            "Update deployment image to version ${BUILD_NUMBER}"
+                        git commit \
+                            -m "Update deployment image to version ${BUILD_NUMBER}"
 
                         git push \
                             https://${GITHUB_TOKEN}@github.com/${GIT_USER_NAME}/${GIT_REPO_NAME}.git \
+                            HEAD:main
+                    '''
+                }
+            }
+        }
+    }
+}
 ```
