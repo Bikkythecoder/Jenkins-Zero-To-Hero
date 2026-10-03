@@ -10,9 +10,14 @@ pipeline {
 
     stages {
 
+        /*
+         * STAGE 1: BUILD AND TEST
+         */
         stage('Build and Test') {
             steps {
                 sh '''
+                    set -e
+
                     cd java-maven-sonar-argocd-helm-k8s/spring-boot-app
 
                     mvn clean package
@@ -21,10 +26,13 @@ pipeline {
         }
 
 
+        /*
+         * STAGE 2: SONARQUBE CODE ANALYSIS
+         */
         stage('Static Code Analysis') {
 
             environment {
-                SONAR_URL = "http://host.docker.internal:9000"
+                SONAR_URL = 'http://host.docker.internal:9000'
             }
 
             steps {
@@ -37,6 +45,8 @@ pipeline {
                 ]) {
 
                     sh '''
+                        set -e
+
                         cd java-maven-sonar-argocd-helm-k8s/spring-boot-app
 
                         mvn org.sonarsource.scanner.maven:sonar-maven-plugin:sonar \
@@ -48,6 +58,9 @@ pipeline {
         }
 
 
+        /*
+         * STAGE 3: BUILD AND PUSH DOCKER IMAGE
+         */
         stage('Build and Push Docker Image') {
 
             environment {
@@ -65,21 +78,31 @@ pipeline {
                 ]) {
 
                     sh '''
+                        set -e
+
                         cd java-maven-sonar-argocd-helm-k8s/spring-boot-app
 
+                        # Use the Docker socket mounted from the host
                         export DOCKER_HOST=unix:///var/run/docker.sock
                         unset DOCKER_CONTEXT
 
+                        # Verify Docker connectivity
+                        docker version
+
+                        # Login to Docker Hub
                         echo "$DOCKER_PASSWORD" | docker login \
                             --username "$DOCKER_USERNAME" \
                             --password-stdin
 
+                        # Build AMD64 image
                         docker build \
                             --platform linux/amd64 \
                             -t "$DOCKER_IMAGE" .
 
+                        # Push image to Docker Hub
                         docker push "$DOCKER_IMAGE"
 
+                        # Logout after push
                         docker logout
                     '''
                 }
@@ -87,11 +110,14 @@ pipeline {
         }
 
 
+        /*
+         * STAGE 4: UPDATE KUBERNETES DEPLOYMENT
+         */
         stage('Update Deployment File') {
 
             environment {
-                GIT_REPO_NAME = "Jenkins-Zero-To-Hero"
-                GIT_USER_NAME = "Bikkythecoder"
+                GIT_REPO_NAME = 'Jenkins-Zero-To-Hero'
+                GIT_USER_NAME = 'Bikkythecoder'
             }
 
             steps {
@@ -104,22 +130,40 @@ pipeline {
                 ]) {
 
                     sh '''
+                        set -e
+
+                        # Configure Git
                         git config user.email "bikky.roy2000@gmail.com"
                         git config user.name "Bikkythecoder"
 
-                        sed -i \
-                            "s/replaceImageTag/${BUILD_NUMBER}/g" \
-                            java-maven-sonar-argocd-helm-k8s/spring-boot-app-manifests/deployment.yml
+                        # Kubernetes deployment file
+                        DEPLOYMENT_FILE="java-maven-sonar-argocd-helm-k8s/spring-boot-app-manifests/deployment.yml"
 
-                        git add \
-                            java-maven-sonar-argocd-helm-k8s/spring-boot-app-manifests/deployment.yml
+                        # Update the Docker image tag
+                        sed -i -E \
+                            "s|(image:[[:space:]]*bikkybabu/ultimate-cicd:)[^[:space:]]+|\\1${BUILD_NUMBER}|" \
+                            "$DEPLOYMENT_FILE"
 
-                        git commit \
-                            -m "Update deployment image to version ${BUILD_NUMBER}"
+                        # Show the updated image
+                        echo "Updated deployment image:"
+                        grep "image:" "$DEPLOYMENT_FILE"
 
-                        git push \
-                            https://${GITHUB_TOKEN}@github.com/${GIT_USER_NAME}/${GIT_REPO_NAME}.git \
-                            HEAD:main
+                        # Stage the deployment file
+                        git add "$DEPLOYMENT_FILE"
+
+                        # Check whether there are changes
+                        if git diff --cached --quiet; then
+                            echo "No deployment changes detected."
+                        else
+                            # Commit changes
+                            git commit \
+                                -m "Update deployment image to version ${BUILD_NUMBER}"
+
+                            # Push changes to GitHub
+                            git push \
+                                "https://${GITHUB_TOKEN}@github.com/${GIT_USER_NAME}/${GIT_REPO_NAME}.git" \
+                                HEAD:main
+                        fi
                     '''
                 }
             }
