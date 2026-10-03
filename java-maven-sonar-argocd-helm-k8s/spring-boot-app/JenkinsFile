@@ -20,7 +20,6 @@ pipeline {
             }
         }
 
-
         stage('Static Code Analysis') {
 
             environment {
@@ -47,7 +46,6 @@ pipeline {
             }
         }
 
-
         stage('Build and Push Docker Image') {
 
             environment {
@@ -56,33 +54,35 @@ pipeline {
 
             steps {
 
-                withCredentials([
-                    usernamePassword(
-                        credentialsId: 'docker-red',
-                        usernameVariable: 'DOCKER_USERNAME',
-                        passwordVariable: 'DOCKER_PASSWORD'
-                    )
-                ]) {
+                script {
 
-                    sh '''
-                        cd java-maven-sonar-argocd-helm-k8s/spring-boot-app
+                    withCredentials([
+                        usernamePassword(
+                            credentialsId: 'docker-cred',
+                            usernameVariable: 'DOCKER_USERNAME',
+                            passwordVariable: 'DOCKER_PASSWORD'
+                        )
+                    ]) {
 
-                        echo "$DOCKER_PASSWORD" | docker login \
-                            --username "$DOCKER_USERNAME" \
-                            --password-stdin
+                        sh '''
+                            cd java-maven-sonar-argocd-helm-k8s/spring-boot-app
 
-                        docker build \
-                            --platform linux/amd64 \
-                            -t "$DOCKER_IMAGE" .
+                            echo "$DOCKER_PASSWORD" | docker login \
+                                --username "$DOCKER_USERNAME" \
+                                --password-stdin
 
-                        docker push "$DOCKER_IMAGE"
+                            docker build \
+                                --platform linux/amd64 \
+                                -t "$DOCKER_IMAGE" .
 
-                        docker logout
-                    '''
+                            docker push "$DOCKER_IMAGE"
+
+                            docker logout
+                        '''
+                    }
                 }
             }
         }
-
 
         stage('Update Deployment File') {
 
@@ -102,6 +102,7 @@ pipeline {
 
                     sh '''
                         git config user.email "bikky.roy2000@gmail.com"
+
                         git config user.name "Bikkythecoder"
 
                         sed -i \
