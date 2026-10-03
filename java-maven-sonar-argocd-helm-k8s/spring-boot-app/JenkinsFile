@@ -40,8 +40,8 @@ pipeline {
                         cd java-maven-sonar-argocd-helm-k8s/spring-boot-app
 
                         mvn org.sonarsource.scanner.maven:sonar-maven-plugin:sonar \
-                            -Dsonar.login=$SONAR_AUTH_TOKEN \
-                            -Dsonar.host.url=$SONAR_URL
+                            -Dsonar.login="$SONAR_AUTH_TOKEN" \
+                            -Dsonar.host.url="$SONAR_URL"
                     '''
                 }
             }
@@ -56,35 +56,32 @@ pipeline {
 
             steps {
 
-                script {
+                withCredentials([
+                    usernamePassword(
+                        credentialsId: 'docker-cred',
+                        usernameVariable: 'DOCKER_USERNAME',
+                        passwordVariable: 'DOCKER_PASSWORD'
+                    )
+                ]) {
 
-                    withCredentials([
-                        usernamePassword(
-                            credentialsId: 'docker-cred',
-                            usernameVariable: 'DOCKER_USERNAME',
-                            passwordVariable: 'DOCKER_PASSWORD'
-                        )
-                    ]) {
+                    sh '''
+                        cd java-maven-sonar-argocd-helm-k8s/spring-boot-app
 
-                        sh '''
-                            cd java-maven-sonar-argocd-helm-k8s/spring-boot-app
+                        export DOCKER_HOST=unix:///var/run/docker.sock
+                        unset DOCKER_CONTEXT
 
-                            export DOCKER_HOST=unix:///var/run/docker.sock
-                            unset DOCKER_CONTEXT
+                        echo "$DOCKER_PASSWORD" | docker login \
+                            --username "$DOCKER_USERNAME" \
+                            --password-stdin
 
-                            echo "$DOCKER_PASSWORD" | docker login \
-                                --username "$DOCKER_USERNAME" \
-                                --password-stdin
+                        docker build \
+                            --platform linux/amd64 \
+                            -t "$DOCKER_IMAGE" .
 
-                            docker build \
-                                --platform linux/amd64 \
-                                -t "$DOCKER_IMAGE" .
+                        docker push "$DOCKER_IMAGE"
 
-                            docker push "$DOCKER_IMAGE"
-
-                            docker logout
-                        '''
-                    }
+                        docker logout
+                    '''
                 }
             }
         }
@@ -108,7 +105,6 @@ pipeline {
 
                     sh '''
                         git config user.email "bikky.roy2000@gmail.com"
-
                         git config user.name "Bikkythecoder"
 
                         sed -i \
@@ -116,5 +112,18 @@ pipeline {
                             java-maven-sonar-argocd-helm-k8s/spring-boot-app-manifests/deployment.yml
 
                         git add \
-                            java-maven-sonar-argocd-helm-k8s/spring-boot-app
+                            java-maven-sonar-argocd-helm-k8s/spring-boot-app-manifests/deployment.yml
+
+                        git commit \
+                            -m "Update deployment image to version ${BUILD_NUMBER}"
+
+                        git push \
+                            https://${GITHUB_TOKEN}@github.com/${GIT_USER_NAME}/${GIT_REPO_NAME}.git \
+                            HEAD:main
+                    '''
+                }
+            }
+        }
+    }
+}
 ```
